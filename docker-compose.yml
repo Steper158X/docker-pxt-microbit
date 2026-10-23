@@ -1,0 +1,18 @@
+services:
+  pxt-microbit:
+    build:
+      context: .
+      args:
+        PXT_MICROBIT_REF: master
+    image: pxt-microbit:latest
+    container_name: pxt-microbit
+    ports:
+      - "3232:3232"
+      - "3233:3233"
+    volumes:
+      # Projects saved by the local server
+      - pxt-projects:/app/projects
+    restart: unless-stopped
+
+volumes:
+  pxt-projects:

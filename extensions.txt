@@ -1,0 +1,5 @@
+# GitHub extensions to bundle into the editor for offline use.
+# One per line: owner/repo or owner/repo#tag-or-branch
+# Dependencies on other GitHub extensions are fetched automatically.
+microsoft/pxt-neopixel
+microbit-foundation/pxt-microbit-v2-power
