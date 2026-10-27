@@ -34,6 +34,6 @@ COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 RUN sed -i 's/\r$//' /usr/local/bin/docker-entrypoint.sh \
     && chmod +x /usr/local/bin/docker-entrypoint.sh
 
-EXPOSE 3232 3233
+EXPOSE 3232 3233 3443
 ENTRYPOINT ["docker-entrypoint.sh"]
 CMD ["static"]

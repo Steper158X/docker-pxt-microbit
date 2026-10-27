@@ -9,10 +9,18 @@ services:
     ports:
       - "3232:3232"
       - "3233:3233"
+      - "3443:3443"
+    environment:
+      # Host IPs or names other machines use to open the editor over HTTPS
+      # (WebUSB), comma separated, e.g. 192.168.1.10,pxt.local
+      PXT_TLS_HOSTS: ""
     volumes:
       # Projects saved by the local server
       - pxt-projects:/app/projects
+      # Generated local CA and server certificate, see README
+      - pxt-tls:/tls
     restart: unless-stopped
 
 volumes:
   pxt-projects:
+  pxt-tls:

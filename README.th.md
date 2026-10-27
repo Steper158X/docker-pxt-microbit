@@ -41,6 +41,38 @@ docker compose up -d --build
 - extension ที่เป็น TypeScript ล้วนใช้ได้กับทุกแบบผสม ส่วน extension ที่มี C++ จะมี hex เตรียมไว้เฉพาะกรณีเพิ่ม **หนึ่งตัว** ต่อโปรเจกต์ ถ้าใช้ extension ที่มี C++ สองตัวขึ้นไปพร้อมกัน ยังต้องคอมไพล์ผ่าน cloud
 - โปรเจกต์ที่ import มาและอ้างถึง extension แบบ `github:...` จะยังพยายามโหลดจาก GitHub ให้ลบ extension นั้นออกแล้วเพิ่มตัวที่ฝังไว้จากหน้า Extensions แทน
 
+## WebUSB (HTTPS)
+
+เบราว์เซอร์อนุญาต WebUSB เฉพาะ `https://` หรือ `localhost` เพื่อให้เครื่องอื่น flash micro:bit จากเบราว์เซอร์ได้โดยตรง container จะเสิร์ฟ HTTPS เพิ่มที่พอร์ต 3443 ด้วย cert ที่สร้างขึ้นเอง
+
+1. ใส่ IP ของเครื่อง host ใน `docker-compose.yml` (ใส่ชื่อเครื่องเพิ่มได้ คั่นด้วยจุลภาค) แล้วเปิด container
+
+   ```yaml
+   environment:
+     PXT_TLS_HOSTS: "192.168.1.10"
+   ```
+
+   ```bash
+   docker compose up -d
+   ```
+
+2. บนเครื่องลูกข่ายแต่ละเครื่อง ติดตั้ง CA ครั้งเดียว: เปิด **http://&lt;IP เครื่อง host&gt;:3232/rootCA.crt** เปิดไฟล์ที่ดาวน์โหลดมา กด **Install Certificate** แล้วเลือกเก็บใน "Trusted Root Certification Authorities" หรือใช้คำสั่ง (ไม่ต้องเป็น admin)
+
+   ```bash
+   certutil -user -addstore Root rootCA.crt
+   ```
+
+3. เปิด **https://&lt;IP เครื่อง host&gt;:3443** ใน Chrome หรือ Edge เสียบ micro:bit กด **Connect device** จากนั้นกด **Download** จะ flash ลงบอร์ดโดยตรง ถ้าไม่เจอบอร์ดให้อัปเดต firmware DAPLink
+
+การทำงาน
+- ตอนเริ่มครั้งแรก container จะสร้าง CA ของตัวเองเก็บไว้ใน volume `pxt-tls` แล้วออก cert ของ server ให้ `localhost` และ host ใน `PXT_TLS_HOSTS` และจะออกใบใหม่เองเมื่อ host เปลี่ยนหรือใกล้หมดอายุ
+- CA นี้ออก cert ได้เฉพาะ IP ภายใน (`10.x`, `172.16-31.x`, `192.168.x`, `127.x`) และชื่อที่ลงท้ายด้วย `.local`, `.lan`, `.home.arpa` หรือ `.internal` ต่อให้ key หลุดก็ปลอมเป็นเว็บไซต์สาธารณะไม่ได้ host อื่นใน `PXT_TLS_HOSTS` จะถูกข้ามพร้อมคำเตือน
+- เสิร์ฟเฉพาะ cert สาธารณะของ CA ค่า fingerprint SHA-256 แสดงใน `docker compose logs` ใช้เทียบกับตอนติดตั้งได้
+- เปลี่ยน IP ใน `PXT_TLS_HOSTS` ไม่ต้องติดตั้ง CA ใหม่ แต่ถ้าลบ volume (`docker compose down -v`) จะได้ CA ใหม่ และทุกเครื่องต้องติดตั้งใหม่
+- ควรจอง IP ของเครื่อง host ไว้ที่ router (DHCP reservation) เพื่อไม่ให้ IP เปลี่ยน
+- เปิดพอร์ต 3443 ใน firewall ของเครื่อง host ด้วย
+- ถ้าต้องการใช้ cert ของตัวเอง (เช่นจาก mkcert) ให้ mount โฟลเดอร์ที่มี `cert.pem` และ `key.pem` ไปที่ `/certs` เช่นเพิ่ม `- ./certs:/certs:ro` ใน `volumes`
+
 ## คำสั่งที่ใช้บ่อย
 
 ```bash
@@ -62,11 +94,11 @@ docker compose build --no-cache # ดึงโค้ดล่าสุดแล�
 
 ถ้าจะใช้โหมด `serve` ให้เพิ่ม `command: serve` ใน service ของ `docker-compose.yml`
 
-ตัวแปรสภาพแวดล้อม: `PXT_PORT` (ค่าเริ่มต้น 3232), `PXT_WSPORT` (3233 ใช้เฉพาะ `serve`), `PXT_LOCAL_TOKEN` (`offline` ใช้เฉพาะ `serve`)
+ตัวแปรสภาพแวดล้อม: `PXT_PORT` (ค่าเริ่มต้น 3232), `PXT_HTTPS_PORT` (3443 ใช้เฉพาะ `static`), `PXT_TLS_HOSTS` (ว่าง: IP/ชื่อของ host สำหรับ cert HTTPS), `PXT_WSPORT` (3233 ใช้เฉพาะ `serve`), `PXT_LOCAL_TOKEN` (`offline` ใช้เฉพาะ `serve`)
 
 ## หมายเหตุ
 
 - server ไม่มีระบบยืนยันตัวตน ให้ใช้เฉพาะในวงแลน ห้ามเปิดพอร์ตนี้สู่อินเทอร์เน็ต
 - การคอมไพล์ C++ (`.cpp`) ที่ไม่มีใน hex cache ใช้ cloud build ของ MakeCode จึงต้องมีอินเทอร์เน็ต
 - การ flash ผ่าน WebUSB ทำจากเบราว์เซอร์ฝั่งเครื่องคุณ (Chrome/Edge) ไม่ต้องส่ง USB เข้า container
-- เบราว์เซอร์อนุญาต WebUSB เฉพาะ `https://` หรือ `localhost` เครื่องอื่นที่เปิดผ่าน `http://<IP เครื่อง host>` เมื่อกด **Download** จะได้ไฟล์ `.hex` ให้ลากไฟล์ไปวางในไดรฟ์ `MICROBIT`
+- เครื่องอื่นที่เปิดผ่าน `http://<IP เครื่อง host>:3232` เมื่อกด **Download** จะได้ไฟล์ `.hex` ให้ลากไฟล์ไปวางในไดรฟ์ `MICROBIT` ถ้าต้องการ WebUSB ให้ใช้ที่อยู่ HTTPS (ดูหัวข้อด้านบน)

@@ -41,6 +41,38 @@ Limitations:
 - TypeScript-only extensions work in any combination. For extensions with C++, the hex cache only covers adding **one** of them to a project. Using two or more C++ extensions together still needs the cloud build.
 - Imported projects that reference an extension as `github:...` still try to load it from GitHub. Remove that extension and add the bundled one from the Extensions dialog instead.
 
+## WebUSB (HTTPS)
+
+Browsers allow WebUSB only on `https://` or `localhost`. So that other machines can flash a micro:bit straight from the browser, the container also serves HTTPS on port 3443 with a certificate it makes itself.
+
+1. Set the host IP in `docker-compose.yml` (add a name too if you use one, comma separated), then start the container:
+
+   ```yaml
+   environment:
+     PXT_TLS_HOSTS: "192.168.1.10"
+   ```
+
+   ```bash
+   docker compose up -d
+   ```
+
+2. On each client machine, install the CA once: open **http://&lt;host IP&gt;:3232/rootCA.crt**, open the downloaded file, choose **Install Certificate**, and put it in "Trusted Root Certification Authorities". Or from a terminal (no admin needed):
+
+   ```bash
+   certutil -user -addstore Root rootCA.crt
+   ```
+
+3. Open **https://&lt;host IP&gt;:3443** in Chrome or Edge, plug in the micro:bit, choose **Connect device**, and **Download** then flashes the board directly. If the board isn't listed, update its DAPLink firmware.
+
+How it works:
+- On first start the container creates a local CA and keeps it in the `pxt-tls` volume. It then issues a server certificate for `localhost` and `PXT_TLS_HOSTS`, and reissues it when the hosts change or it is close to expiring.
+- The CA can only sign private IPs (`10.x`, `172.16-31.x`, `192.168.x`, `127.x`) and names ending in `.local`, `.lan`, `.home.arpa` or `.internal`, so even if its key leaks it can't impersonate public websites. Other hosts in `PXT_TLS_HOSTS` are skipped with a warning.
+- Only the public CA certificate is published. Its SHA-256 fingerprint is printed in `docker compose logs`, so you can compare it with the one shown when you install it.
+- Changing the IP in `PXT_TLS_HOSTS` doesn't require reinstalling the CA. Deleting the volume (`docker compose down -v`) creates a new CA, which every client then has to install again.
+- Reserve the host IP on the router (DHCP reservation) so it doesn't change.
+- Allow port 3443 through the host firewall.
+- To use your own certificate instead (e.g. from mkcert), mount a folder with `cert.pem` and `key.pem` at `/certs`, for example `- ./certs:/certs:ro` under `volumes`.
+
 ## Common commands
 
 ```bash
@@ -62,11 +94,11 @@ To pick a version, set `PXT_MICROBIT_REF` in `docker-compose.yml` to a branch or
 
 To use `serve`, add `command: serve` to the service in `docker-compose.yml`.
 
-Environment variables: `PXT_PORT` (default 3232), `PXT_WSPORT` (3233, `serve` only), `PXT_LOCAL_TOKEN` (`offline`, `serve` only)
+Environment variables: `PXT_PORT` (default 3232), `PXT_HTTPS_PORT` (3443, `static` only), `PXT_TLS_HOSTS` (empty: host IPs/names for the HTTPS certificate), `PXT_WSPORT` (3233, `serve` only), `PXT_LOCAL_TOKEN` (`offline`, `serve` only)
 
 ## Notes
 
 - The server has no authentication. Share it on the local network only and don't expose the port to the internet.
 - C++ (`.cpp`) builds that aren't in the hex cache use the MakeCode cloud build and need internet access.
 - Flashing over WebUSB happens in the browser on your machine (Chrome/Edge). No USB passthrough into the container is needed.
-- Browsers allow WebUSB only on `https://` or `localhost`. On other machines, opened through `http://<host IP>`, **Download** saves a `.hex` file: drag it onto the `MICROBIT` drive.
+- On other machines opened through `http://<host IP>:3232`, **Download** saves a `.hex` file: drag it onto the `MICROBIT` drive. Use the HTTPS address for WebUSB (see above).
