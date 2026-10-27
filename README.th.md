@@ -10,11 +10,12 @@
 docker compose up -d --build
 ```
 
-จากนั้นเปิด **http://localhost:3232/#local_token=offline** (ครั้งแรกครั้งเดียว เบราว์เซอร์จะจำ token ไว้ ครั้งต่อไปเปิด http://localhost:3232 ได้เลย)
+จากนั้นเปิด **http://localhost:3232** บนเครื่องนี้ หรือ **http://&lt;IP เครื่อง host&gt;:3232** (เช่น `http://192.168.1.10:3232`) จากคอมเครื่องอื่นในวงแลนเดียวกัน
 
-- การ build ครั้งแรกใช้เวลาหลายนาที (clone, `npm install`, `pxt buildtarget`, สร้าง hex cache)
-- ต้องเปิดด้วย token ก่อน ไม่อย่างนั้นเว็บจะไม่ใช้ local server คือไม่ใช้ hex cache แบบ offline และไม่บันทึกโปรเจกต์ลงเซิร์ฟเวอร์
-- โปรเจกต์ที่บันทึกบน local server จะเก็บไว้ใน volume `pxt-projects` (`/app/projects`)
+- การ build ครั้งแรกใช้เวลาหลายนาที (clone, `npm install`, `pxt buildtarget`, `pxt staticpkg` พร้อมสร้าง hex cache)
+- ค่าเริ่มต้น container จะเสิร์ฟ editor เป็นเว็บ static (โหมด `static`) ไม่ต้องใช้ token เปิดจากเครื่องไหนในวงแลนก็ได้ และปุ่ม **Download** ใช้ hex cache ที่ฝังมา จึงใช้งาน offline ได้
+- โปรเจกต์จะบันทึกไว้ในเบราว์เซอร์ของแต่ละเครื่อง ถ้าต้องการเก็บสำรองให้กด **Download** หรือ **Export**
+- ดู IP ของเครื่อง host บน Windows ด้วยคำสั่ง `ipconfig` ถ้าเครื่องอื่นเข้าไม่ได้ ให้เปิดพอร์ต 3232 ใน firewall ของเครื่อง host
 
 ## Extension แบบ offline
 
@@ -38,9 +39,7 @@ docker compose up -d --build
 ข้อจำกัด
 - ตอน build image ต้องมีอินเทอร์เน็ต แต่หลังจากนั้นใช้ offline ได้
 - extension ที่เป็น TypeScript ล้วนใช้ได้กับทุกแบบผสม ส่วน extension ที่มี C++ จะมี hex เตรียมไว้เฉพาะกรณีเพิ่ม **หนึ่งตัว** ต่อโปรเจกต์ ถ้าใช้ extension ที่มี C++ สองตัวขึ้นไปพร้อมกัน ยังต้องคอมไพล์ผ่าน cloud
-- hex cache ใช้ได้เมื่อเปิดผ่าน `localhost` และมี token
 - โปรเจกต์ที่ import มาและอ้างถึง extension แบบ `github:...` จะยังพยายามโหลดจาก GitHub ให้ลบ extension นั้นออกแล้วเพิ่มตัวที่ฝังไว้จากหน้า Extensions แทน
-- ถ้าไม่ต้องการ hex cache (build เร็วขึ้น) ให้ตั้ง build arg `PXT_OFFLINE_HEX=0`
 
 ## คำสั่งที่ใช้บ่อย
 
@@ -56,14 +55,18 @@ docker compose build --no-cache # ดึงโค้ดล่าสุดแล�
 
 | คำสั่ง | ความหมาย |
 |---|---|
-| `serve` (ค่าเริ่มต้น) | `pxt serve --just` ใช้ target ที่ build ไว้ใน image เริ่มเร็ว |
-| `serve-full` | build target ใหม่ก่อน serve |
+| `static` (ค่าเริ่มต้น) | เสิร์ฟ editor แบบ packaged (`built/packaged`) ให้ทุกเครื่องในวงแลน |
+| `serve` | `pxt serve --just` เป็น dev server ของ pxt บันทึกโปรเจกต์ลง volume `pxt-projects` (`/app/projects`) hex cache ใช้ได้เฉพาะเมื่อเปิดผ่าน `localhost`, `127.0.0.1`, `192.168.x.x` หรือ `*.local` และเปิดด้วย `#local_token=offline` อย่างน้อยหนึ่งครั้ง |
+| `serve-full` | เหมือน `serve` แต่ build target ใหม่ก่อน |
 | คำสั่งอื่น | รันตรง ๆ เช่น `docker compose run --rm pxt-microbit pxt help` |
 
-ตัวแปรสภาพแวดล้อม: `PXT_PORT` (ค่าเริ่มต้น 3232), `PXT_WSPORT` (3233), `PXT_LOCAL_TOKEN` (`offline`)
+ถ้าจะใช้โหมด `serve` ให้เพิ่ม `command: serve` ใน service ของ `docker-compose.yml`
+
+ตัวแปรสภาพแวดล้อม: `PXT_PORT` (ค่าเริ่มต้น 3232), `PXT_WSPORT` (3233 ใช้เฉพาะ `serve`), `PXT_LOCAL_TOKEN` (`offline` ใช้เฉพาะ `serve`)
 
 ## หมายเหตุ
 
-- server เปิดด้วย `--noauth` ห้ามเปิดพอร์ตนี้สู่อินเทอร์เน็ต
+- server ไม่มีระบบยืนยันตัวตน ให้ใช้เฉพาะในวงแลน ห้ามเปิดพอร์ตนี้สู่อินเทอร์เน็ต
 - การคอมไพล์ C++ (`.cpp`) ที่ไม่มีใน hex cache ใช้ cloud build ของ MakeCode จึงต้องมีอินเทอร์เน็ต
 - การ flash ผ่าน WebUSB ทำจากเบราว์เซอร์ฝั่งเครื่องคุณ (Chrome/Edge) ไม่ต้องส่ง USB เข้า container
+- เบราว์เซอร์อนุญาต WebUSB เฉพาะ `https://` หรือ `localhost` เครื่องอื่นที่เปิดผ่าน `http://<IP เครื่อง host>` เมื่อกด **Download** จะได้ไฟล์ `.hex` ให้ลากไฟล์ไปวางในไดรฟ์ `MICROBIT`

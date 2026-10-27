@@ -9,8 +9,8 @@ RUN apt-get update \
     && apt-get install -y --no-install-recommends git ca-certificates python3 build-essential \
     && rm -rf /var/lib/apt/lists/*
 
-# PXT command line
-RUN npm install -g pxt
+# PXT command line, plus a static file server for the packaged editor
+RUN npm install -g pxt http-server@14.1.1
 
 WORKDIR /app
 RUN git clone --depth 1 --branch ${PXT_MICROBIT_REF} https://github.com/microsoft/pxt-microbit.git .
@@ -24,11 +24,11 @@ RUN node /opt/pxt-ext/bundle-extensions.js /opt/pxt-ext/extensions.txt /app
 # Build the target once at image build time so `pxt serve` starts fast
 RUN pxt buildtarget
 
-# Pre-compile native (C++) images for each bundled extension into
-# built/hexcache, so adding one extension needs no cloud build later.
-# staticpkg runs the packaged target build; its static site output is not needed.
-ARG PXT_OFFLINE_HEX=1
-RUN if [ "$PXT_OFFLINE_HEX" = "1" ]; then pxt staticpkg && rm -rf built/packaged; fi
+# Package the editor as a static site in built/packaged. The packaged build
+# also pre-compiles native (C++) images for each bundled extension into
+# built/hexcache and copies them into the site, so any browser on the network
+# can download hex files without a cloud build.
+RUN pxt staticpkg
 
 COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 RUN sed -i 's/\r$//' /usr/local/bin/docker-entrypoint.sh \
@@ -36,4 +36,4 @@ RUN sed -i 's/\r$//' /usr/local/bin/docker-entrypoint.sh \
 
 EXPOSE 3232 3233
 ENTRYPOINT ["docker-entrypoint.sh"]
-CMD ["serve"]
+CMD ["static"]

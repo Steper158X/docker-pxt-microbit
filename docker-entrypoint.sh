@@ -12,6 +12,12 @@ mkdir -p "$HOME/.pxt"
 printf '{\n    "noAutoStart": true,\n    "localToken": "%s"\n}\n' "$TOKEN" > "$HOME/.pxt/config.json"
 
 case "$1" in
+  static)
+    shift
+    # Static editor from built/packaged: works from any machine on the network
+    # (no token), uses the bundled hex cache, saves projects in each browser.
+    exec http-server /app/built/packaged -a 0.0.0.0 -p "$PORT" -c-1 "$@"
+    ;;
   serve)
     shift
     # --just: serve the target built into the image without rebuilding

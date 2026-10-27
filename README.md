@@ -10,11 +10,12 @@ Run MakeCode for micro:bit ([microsoft/pxt-microbit](https://github.com/microsof
 docker compose up -d --build
 ```
 
-Then open **http://localhost:3232/#local_token=offline**. You only need the token once: the browser remembers it, and after that http://localhost:3232 is enough.
+Then open **http://localhost:3232** on this machine, or **http://&lt;host IP&gt;:3232** (e.g. `http://192.168.1.10:3232`) on other computers on the same network.
 
-- The first build takes several minutes (clone, `npm install`, `pxt buildtarget`, hex cache).
-- Open the token URL first. Without the token the editor doesn't use the local server, so it skips the offline hex cache and doesn't save projects to the server.
-- Projects saved on the local server are kept in the `pxt-projects` volume (`/app/projects`).
+- The first build takes several minutes (clone, `npm install`, `pxt buildtarget`, `pxt staticpkg` with the hex cache).
+- By default the container serves the editor as a static site (`static` mode). No token is needed, it works from any machine on the network, and **Download** uses the bundled hex cache, so it works offline.
+- Projects are saved in each user's browser. Use **Download** or **Export** to keep a copy.
+- To find the host IP on Windows, run `ipconfig`. Allow port 3232 through the host firewall if other machines can't connect.
 
 ## Offline extensions
 
@@ -38,9 +39,7 @@ During the build:
 Limitations:
 - Building the image needs internet access. After that the editor works offline.
 - TypeScript-only extensions work in any combination. For extensions with C++, the hex cache only covers adding **one** of them to a project. Using two or more C++ extensions together still needs the cloud build.
-- The hex cache is only used when the editor is opened through `localhost` with the token.
 - Imported projects that reference an extension as `github:...` still try to load it from GitHub. Remove that extension and add the bundled one from the Extensions dialog instead.
-- To skip the hex cache (faster build), set the build arg `PXT_OFFLINE_HEX=0`.
 
 ## Common commands
 
@@ -56,14 +55,18 @@ To pick a version, set `PXT_MICROBIT_REF` in `docker-compose.yml` to a branch or
 
 | Command | Meaning |
 |---|---|
-| `serve` (default) | `pxt serve --just`: serves the target built into the image, starts fast |
-| `serve-full` | rebuilds the target before serving |
+| `static` (default) | serves the packaged editor (`built/packaged`) for every machine on the network |
+| `serve` | `pxt serve --just`: the pxt dev server, saves projects to the `pxt-projects` volume (`/app/projects`). Hex cache works only from `localhost`, `127.0.0.1`, `192.168.x.x` or `*.local` opened once with `#local_token=offline` |
+| `serve-full` | like `serve`, but rebuilds the target first |
 | anything else | runs as is, e.g. `docker compose run --rm pxt-microbit pxt help` |
 
-Environment variables: `PXT_PORT` (default 3232), `PXT_WSPORT` (3233), `PXT_LOCAL_TOKEN` (`offline`)
+To use `serve`, add `command: serve` to the service in `docker-compose.yml`.
+
+Environment variables: `PXT_PORT` (default 3232), `PXT_WSPORT` (3233, `serve` only), `PXT_LOCAL_TOKEN` (`offline`, `serve` only)
 
 ## Notes
 
-- The server runs with `--noauth`. Don't expose this port to the internet.
+- The server has no authentication. Share it on the local network only and don't expose the port to the internet.
 - C++ (`.cpp`) builds that aren't in the hex cache use the MakeCode cloud build and need internet access.
 - Flashing over WebUSB happens in the browser on your machine (Chrome/Edge). No USB passthrough into the container is needed.
+- Browsers allow WebUSB only on `https://` or `localhost`. On other machines, opened through `http://<host IP>`, **Download** saves a `.hex` file: drag it onto the `MICROBIT` drive.
